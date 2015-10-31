@@ -19,7 +19,7 @@ public class App extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_app);
 
- //camera button action
+ //camera button action and other fuctions
         cameraBtn = (ImageButton) findViewById(R.id.cameraBtn);
         cameraBtn.setOnClickListener((new View.OnClickListener() {
             @Override
