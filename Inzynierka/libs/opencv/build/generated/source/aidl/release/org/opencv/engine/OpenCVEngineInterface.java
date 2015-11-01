@@ -1,6 +1,6 @@
 /*
  * This file is auto-generated.  DO NOT MODIFY.
- * Original file: C:\\Users\\mad\\Downloads\\inzynierka\\repo\\Rozpoznawanie-tablic-rejestracyjnych-\\Inzynierka\\libs\\opencv\\src\\org\\opencv\\engine\\OpenCVEngineInterface.aidl
+ * Original file: C:\\Users\\mad\\Desktop\\projekt_inz\\Inzynierka\\libs\\opencv\\src\\org\\opencv\\engine\\OpenCVEngineInterface.aidl
  */
 package org.opencv.engine;
 /**
