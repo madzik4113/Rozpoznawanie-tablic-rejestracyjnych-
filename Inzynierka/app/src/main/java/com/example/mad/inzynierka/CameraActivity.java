@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.SurfaceView;
 import android.view.WindowManager;
 import android.widget.Toast;
@@ -12,8 +14,10 @@ import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.JavaCameraView;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfRect;
+import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
@@ -27,7 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 
-public class CameraActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2{
+public class CameraActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2, GestureDetector.OnGestureListener{
 
     private static final String TAG = "CameraActivity.java";
     private static final Scalar    PLATE_RECT_COLOR     = new Scalar(0, 255, 0, 255);
@@ -41,6 +45,11 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
     private int mAbsolutePlateSize = 0;
     private float mRelativePlateSize = 0.2f;
 
+    private GestureDetector mGestureDetector;
+
+
+
+
 
 
     public BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
@@ -52,7 +61,7 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
                     try {
                         //Inicjujemy && ladujemy klasifikator
                         InputStream is = getResources().openRawResource(R.raw.europe);
-                        File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
+                        File cascadeDir = getDir("europe", Context.MODE_PRIVATE);
                         mCascadeFile = new File(cascadeDir, "europe.xml"); //wczytujemy klasyfikator z R.raw.cascade
                         FileOutputStream os = new FileOutputStream(mCascadeFile);
 
@@ -84,6 +93,7 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
                     }
                     cameraView.enableView();
                     cameraView.enableFpsMeter();
+
                 } break;
                 default: {
                     super.onManagerConnected(status);
@@ -100,9 +110,13 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_camera);
 
+
+
         cameraView = (JavaCameraView) findViewById(R.id.cameraView);
         cameraView.setVisibility(SurfaceView.VISIBLE);
         cameraView.setCvCameraViewListener(this);
+
+
 
     }
 
@@ -133,8 +147,51 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
         }
     }
 
+    public boolean onGenericMotionEvent(MotionEvent e) {
+        mGestureDetector.onTouchEvent(e);
+        return true;
+    }
+
+    @Override
+    public boolean onDown(MotionEvent e) {
+        return false;
+    }
+
+    @Override
+    public void onShowPress(MotionEvent e) {
+
+    }
+
+    @Override
+    public boolean onSingleTapUp(MotionEvent e) {
+        return false;
+    }
+
+    @Override
+    public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+        return false;
+    }
+
+    @Override
+    public void onLongPress(MotionEvent e) {
+
+    }
+
+    public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY){
+        return false;
+    }
+
+    private void setMinPlateSize(float plateSize) {
+        mRelativePlateSize = plateSize;
+        mAbsolutePlateSize = 0;
+
+        Toast.makeText(this, String.format("Plate size: %.0f%%", mRelativePlateSize*100.0f), Toast.LENGTH_SHORT).show();
+    }
+
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
+
+        //szukamy tablicy
 
         mRgba = inputFrame.rgba();
         mGray = inputFrame.gray();
@@ -160,8 +217,16 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
             );
 
         Rect[] platesArray = plates.toArray();
+
         for(int i=0;i<platesArray.length;i++){
+            int x = platesArray[i].x;
+            int y = platesArray[i].y;
+            int w = platesArray[i].width;
+            int h = platesArray[i].height;
+
             Imgproc.rectangle(mRgba, platesArray[i].tl(), platesArray[i].br(), PLATE_RECT_COLOR, 3);
+            Log.e(TAG, "Tablica znaleziona!");
+            Imgproc.putText(mRgba, "Znalazlem tablice!", new Point(x,y-35), Core.FONT_HERSHEY_PLAIN,3, new Scalar(255,0,0), 3);
 
         }
 
