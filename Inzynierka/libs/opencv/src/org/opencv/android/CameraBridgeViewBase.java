@@ -1,13 +1,5 @@
 package org.opencv.android;
 
-import java.util.List;
-
-import org.opencv.R;
-import org.opencv.android.Utils;
-import org.opencv.core.Mat;
-import org.opencv.core.Size;
-import org.opencv.videoio.Videoio;
-
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
@@ -20,6 +12,12 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+
+import org.opencv.R;
+import org.opencv.core.Mat;
+import org.opencv.core.Size;
+
+import java.util.List;
 
 /**
  * This is a basic class, implementing the interaction with Camera and OpenCV library.
@@ -134,7 +132,7 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
          * The returned values - is a modified frame which needs to be displayed on the screen.
          * TODO: pass the parameters specifying the format of the frame (BPP, YUV or RGB and etc)
          */
-        public Mat onCameraFrame(CvCameraViewFrame inputFrame);
+        public Mat onCameraFrame(CvCameraViewFrame inputFrame) throws InterruptedException;
     };
 
     protected class CvCameraViewListenerAdapter implements CvCameraViewListener2  {
@@ -386,7 +384,7 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
      * then displayed on the screen.
      * @param frame - the current frame to be delivered
      */
-    protected void deliverAndDrawFrame(CvCameraViewFrame frame) {
+    protected void deliverAndDrawFrame(CvCameraViewFrame frame) throws InterruptedException {
         Mat modified;
 
         if (mListener != null) {
