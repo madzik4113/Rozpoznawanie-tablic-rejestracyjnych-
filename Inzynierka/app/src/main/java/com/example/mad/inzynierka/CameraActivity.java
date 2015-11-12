@@ -1,10 +1,13 @@
 package com.example.mad.inzynierka;
 
 import android.app.Activity;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
@@ -25,6 +28,7 @@ import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
+import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
 
@@ -43,9 +47,10 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
     private CascadeClassifier mJavaDetector;
     private JavaCameraView cameraView;
 
-
     private Mat mRgba;
     private Mat mGray;
+    private Mat newPlate;
+    private Size sizePlate;
 
     private int mAbsolutePlateSize = 0;
     private float mRelativePlateSize = 0.2f;
@@ -54,12 +59,8 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
     TessBaseAPI baseApi;
 
     public static final String DATA_PATH = Environment.getExternalStorageDirectory().toString() + "/projektInz/";
-
-    // You should have the trained data file in assets folder
-    // You can get them at:
-    // http://code.google.com/p/tesseract-ocr/downloads/list
-    public static final String lang = "eng";
-
+    public static final String lang = "pol";
+    final String galleryPath = DATA_PATH + "/plates/";
 
     public BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -179,6 +180,8 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
     public void onCameraViewStarted(int width, int height) {
         mGray = new Mat();
         mRgba = new Mat();
+
+
     }
 
     @Override
@@ -255,6 +258,7 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
         MatOfRect plates = new MatOfRect();
 
         if (mJavaDetector != null)
+        {
             mJavaDetector.detectMultiScale(
                     mGray,
                     plates,
@@ -264,43 +268,120 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
                     new Size(mAbsolutePlateSize, mAbsolutePlateSize),
                     new Size()
             );
-
-        Rect[] platesArray = plates.toArray();
-
-        for(int i=0;i<platesArray.length;i++){
-            int x = platesArray[i].x;
-            int y = platesArray[i].y;
-            int w = platesArray[i].width;
-            int h = platesArray[i].height;
-
-            Imgproc.rectangle(mRgba, platesArray[i].tl(), platesArray[i].br(), PLATE_RECT_COLOR, 3);
-            Log.e(TAG, "Tablica znaleziona!");
-            Imgproc.putText(mRgba, "Znalazlem tablice!", new Point(x, y - 35), Core.FONT_HERSHEY_PLAIN, 3, new Scalar(255, 0, 0), 3);
+                sizePlate = plates.size();
 
         }
 
-        Imgproc.putText(mRgba, "Utrzymaj telefon w miejscu aby zlapac ostrosc", new Point(225, 30), Core.FONT_HERSHEY_PLAIN, 2, new Scalar(0, 0, 0), 3);
 
-//        Bitmap bmp = null;
-//        try {
-//            //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_RGB2BGRA);
-//            Imgproc.cvtColor(mRgba,mRgba, Imgproc.COLOR_GRAY2RGBA, 4);
-//            bmp = Bitmap.createBitmap(mRgba.cols(), mRgba.rows(), Bitmap.Config.ARGB_8888);
-//            Utils.matToBitmap(mRgba, bmp);
-//        }
-//        catch (CvException e){Log.d("Nie udalo sie!",e.getMessage());}
-//
-//        TessBaseAPI baseApi = new TessBaseAPI();
-//        baseApi.setDebug(true);
-//        baseApi.init(DATA_PATH, lang);
-//        Log.e(TAG, "Tesseract zainicjowany!");
-//        baseApi.setImage(bmp);
-//        //baseApi.end();
+        Rect[] platesArray = plates.toArray();
+
+
+        if(platesArray.length>0){
+            //takePlate(mGray);
+            for(int i=0;i<platesArray.length;i++){
+                int x = platesArray[i].x;
+                int y = platesArray[i].y;
+                int w = platesArray[i].width;
+                int h = platesArray[i].height;
+
+
+                Imgproc.rectangle(mRgba, platesArray[i].tl(), platesArray[i].br(), PLATE_RECT_COLOR, 3);
+                Log.e(TAG, "Tablica znaleziona!");
+                Imgproc.putText(mRgba, "Znalazlem tablice!", new Point(x, y - 35), Core.FONT_HERSHEY_PLAIN, 3, new Scalar(255, 0, 0), 3);
+
+
+/*
+
+
+                newPlate =  mGray.submat(platesArray[i]);
+
+                //Imgproc.GaussianBlur(newPlate, newPlate,new Size(3,3),0);
+                //Imgproc.threshold(newPlate, newPlate, 0, 255, Imgproc.THRESH_OTSU);
+                Bitmap bmp = Bitmap.createBitmap(newPlate.cols(),newPlate.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(newPlate, bmp);
+
+                //takePlate(newPlate);
+
+                TessBaseAPI baseApi = new TessBaseAPI();
+                baseApi.setDebug(true);
+                baseApi.init(DATA_PATH, lang);
+                Log.e(TAG, "Tesseract dziala!");
+                String whitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+                String blacklist = "!@#$%^&*()_+=-[]}{;:~`,./<>?'";
+                baseApi.setVariable(baseApi.VAR_CHAR_WHITELIST,whitelist);
+                baseApi.setVariable(baseApi.VAR_CHAR_BLACKLIST,blacklist);
+                baseApi.setImage(bmp);
+                String recognizedText = baseApi.getUTF8Text();
+                Log.e(TAG, "tablica rozpoznana = " + recognizedText);
+*/
+            }
+        }
+
+
+        Imgproc.putText(mRgba, "Utrzymaj telefon w miejscu aby zlapac ostrosc", new Point(225, 30), Core.FONT_HERSHEY_PLAIN, 2, new Scalar(0, 0, 0), 3);
 
 
         return mRgba;
     }
 
 
+    private void takePlate(Mat newPlate) {
 
-}
+        Log.d(TAG, "INSIDE TAKE PHOTO");
+
+        final long currentTimeMillis = System.currentTimeMillis();
+        //final String appName = getString(R.string.app_name);
+        final String appName="Inzynierka";
+        Log.d(TAG, "INSIDE TAKE PHOTO1");
+        Log.d(TAG, "INSIDE TAKE PHOTO2");
+        final String albumPath = galleryPath;
+        final String photoPath = albumPath + "/" +currentTimeMillis + ".png";
+        final ContentValues values = new ContentValues();
+        Log.d(TAG, "INSIDE TAKE PHOTO3");
+        values.put(MediaStore.MediaColumns.DATA, photoPath);
+        values.put(MediaStore.Images.Media.TITLE, appName);
+        values.put(MediaStore.Images.Media.DESCRIPTION, appName);
+        values.put(MediaStore.Images.Media.DATE_TAKEN, currentTimeMillis);
+        // Ensure that the album directory exists.
+        File album = new File(albumPath);
+        Log.d(TAG, "INSIDE TAKE PHOTO4");
+        if (!album.isDirectory() && !album.mkdirs()) {
+            Log.e(TAG, "Failed to create album directory at " +albumPath);
+            onTakePhotoFailed();
+            return;
+        }
+        // Try to create the photo.
+        Log.d(TAG, "INSIDE TAKE PHOTO4.1(debug)");
+        //Imgproc.cvtColor(mRgba, mBgr, Imgproc.COLOR_RGBA2BGR, 3);
+        Log.d(TAG, "INSIDE TAKE PHOTO5");
+        if (!Imgcodecs.imwrite(photoPath, newPlate)) {
+            Log.e(TAG, "Failed to save photo to " + photoPath);
+            onTakePhotoFailed();
+        }
+        Log.d(TAG, "Photo saved successfully to " + photoPath);
+        // Try to insert the photo into the MediaStore.
+        Uri uri;
+        try {
+            uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+        } catch (final Exception e) {
+            Log.e(TAG, "Failed to insert photo into MediaStore");
+            e.printStackTrace();
+            // Since the insertion failed, delete the photo.
+            File photo = new File(photoPath);
+            if (!photo.delete()) {
+                Log.e(TAG, "Failed to delete non-inserted photo");
+            }
+            onTakePhotoFailed();
+            return;
+        }
+        // Open the photo in LabActivity.
+        Log.d(TAG, "INSIDE TAKE PHOTO6");
+    }
+    private void onTakePhotoFailed() {
+
+        }
+    }
+
+
+
+
