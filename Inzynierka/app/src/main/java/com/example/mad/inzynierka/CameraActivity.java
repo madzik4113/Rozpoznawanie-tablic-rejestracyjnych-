@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -21,6 +22,7 @@ import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.JavaCameraView;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfRect;
@@ -59,7 +61,7 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
     TessBaseAPI baseApi;
 
     public static final String DATA_PATH = Environment.getExternalStorageDirectory().toString() + "/projektInz/";
-    public static final String lang = "pol";
+    public static final String lang = "eng";
     final String galleryPath = DATA_PATH + "/plates/";
 
     public BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
@@ -93,8 +95,55 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
                             Toast.makeText(getApplicationContext(), "Klasyfikator zostal zaladowany prawidlowo!", Toast.LENGTH_SHORT).show();
 
 
+                            String[] paths = new String[] { DATA_PATH, DATA_PATH + "tessdata/" };
+
+                            for (String path : paths) {
+                                File dir = new File(path);
+                                if (!dir.exists()) {
+                                    if (!dir.mkdirs()) {
+                                        Log.v(TAG, "ERROR: Creation of directory " + path + " on sdcard failed");
+                                        return;
+                                    } else {
+                                        Log.v(TAG, "Created directory " + path + " on sdcard");
+                                    }
+                                }
+
+                            }
+
+                            if (!(new File(DATA_PATH + "tessdata/" + lang + ".traineddata")).exists()) {
+                                try {
+
+                                    AssetManager assetManager = getAssets();
+                                    InputStream in = assetManager.open("tessdata/" + lang + ".traineddata");
+                                    OutputStream out = new FileOutputStream(DATA_PATH
+                                            + "tessdata/" + lang + ".traineddata");
+
+                                    byte[] buf = new byte[1024];
+                                    int len;
+                                    while ((len = in.read(buf)) > 0) {
+                                        out.write(buf, 0, len);
+                                    }
+                                    in.close();
+                                    out.close();
+
+                                    Log.v(TAG, "Copied " + lang + " traineddata");
+                                } catch (IOException e) {
+                                    Log.e(TAG, "Was unable to copy " + lang + " traineddata " + e.toString());
+                                }
+                            }
+
                             cameraView.enableView();
                             cameraView.enableFpsMeter();
+
+                            baseApi = new TessBaseAPI();
+                            baseApi.setDebug(true);
+                            baseApi.init(DATA_PATH, lang);
+                            Log.e(TAG, "Tesseract dziala!");
+                            //abcdefghijklmnopqrstuvwxyz
+                            String whitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+                            String blacklist = "!@#$%^&*()_+=-[]}{;:~`,./<>?'";
+                            baseApi.setVariable(baseApi.VAR_CHAR_WHITELIST, whitelist);
+                            baseApi.setVariable(baseApi.VAR_CHAR_BLACKLIST, blacklist);
 
 
                         }
@@ -123,42 +172,7 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
 
     protected void onCreate(Bundle savedInstanceState) {
 
-        String[] paths = new String[] { DATA_PATH, DATA_PATH + "tessdata/" };
 
-        for (String path : paths) {
-            File dir = new File(path);
-            if (!dir.exists()) {
-                if (!dir.mkdirs()) {
-                    Log.v(TAG, "ERROR: Creation of directory " + path + " on sdcard failed");
-                    return;
-                } else {
-                    Log.v(TAG, "Created directory " + path + " on sdcard");
-                }
-            }
-
-        }
-
-        if (!(new File(DATA_PATH + "tessdata/" + lang + ".traineddata")).exists()) {
-            try {
-
-                AssetManager assetManager = getAssets();
-                InputStream in = assetManager.open("tessdata/" + lang + ".traineddata");
-                OutputStream out = new FileOutputStream(DATA_PATH
-                        + "tessdata/" + lang + ".traineddata");
-
-                byte[] buf = new byte[1024];
-                int len;
-                while ((len = in.read(buf)) > 0) {
-                    out.write(buf, 0, len);
-                }
-                in.close();
-                out.close();
-
-                Log.v(TAG, "Copied " + lang + " traineddata");
-            } catch (IOException e) {
-                Log.e(TAG, "Was unable to copy " + lang + " traineddata " + e.toString());
-            }
-        }
 
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -168,6 +182,7 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
         cameraView = (JavaCameraView) findViewById(R.id.cameraView);
         cameraView.setVisibility(SurfaceView.VISIBLE);
         cameraView.setCvCameraViewListener(this);
+
 
 
 
@@ -199,6 +214,7 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
         super.onDestroy();
         if(cameraView!=null){
             cameraView.disableView();
+            baseApi.end();
         }
 //        Intent openCamera = new Intent(CameraActivity.this, App.class);
 //        startActivity(openCamera);
@@ -277,8 +293,9 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
 
 
         if(platesArray.length>0){
-            //takePlate(mGray);
+
             for(int i=0;i<platesArray.length;i++){
+
                 int x = platesArray[i].x;
                 int y = platesArray[i].y;
                 int w = platesArray[i].width;
@@ -287,38 +304,34 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
 
                 Imgproc.rectangle(mRgba, platesArray[i].tl(), platesArray[i].br(), PLATE_RECT_COLOR, 3);
                 Log.e(TAG, "Tablica znaleziona!");
-                Imgproc.putText(mRgba, "Znalazlem tablice!", new Point(x, y - 35), Core.FONT_HERSHEY_PLAIN, 3, new Scalar(255, 0, 0), 3);
+//                Imgproc.putText(mRgba, "Znalazlem tablice!", new Point(x, y - 35), Core.FONT_HERSHEY_PLAIN, 3, new Scalar(255, 0, 0), 3);
 
 
-/*
+
 
 
                 newPlate =  mGray.submat(platesArray[i]);
+                //Mat resize = new Mat();
+                //Imgproc.resize(newPlate,resize,new Size(200,50),0,0,Imgproc.INTER_CUBIC);
 
-                //Imgproc.GaussianBlur(newPlate, newPlate,new Size(3,3),0);
-                //Imgproc.threshold(newPlate, newPlate, 0, 255, Imgproc.THRESH_OTSU);
+                Imgproc.GaussianBlur(newPlate,newPlate,new Size(3,3),0);
+                Imgproc.threshold(newPlate, newPlate, 1, 255, Imgproc.THRESH_BINARY);
                 Bitmap bmp = Bitmap.createBitmap(newPlate.cols(),newPlate.rows(), Bitmap.Config.ARGB_8888);
                 Utils.matToBitmap(newPlate, bmp);
 
                 //takePlate(newPlate);
 
-                TessBaseAPI baseApi = new TessBaseAPI();
-                baseApi.setDebug(true);
-                baseApi.init(DATA_PATH, lang);
-                Log.e(TAG, "Tesseract dziala!");
-                String whitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-                String blacklist = "!@#$%^&*()_+=-[]}{;:~`,./<>?'";
-                baseApi.setVariable(baseApi.VAR_CHAR_WHITELIST,whitelist);
-                baseApi.setVariable(baseApi.VAR_CHAR_BLACKLIST,blacklist);
+
                 baseApi.setImage(bmp);
                 String recognizedText = baseApi.getUTF8Text();
                 Log.e(TAG, "tablica rozpoznana = " + recognizedText);
-*/
+                Imgproc.putText(mRgba, "tablica: " + recognizedText, new Point(10, 670), Core.FONT_HERSHEY_PLAIN, 2, new Scalar(255, 0, 0), 2);
+
             }
         }
 
 
-        Imgproc.putText(mRgba, "Utrzymaj telefon w miejscu aby zlapac ostrosc", new Point(225, 30), Core.FONT_HERSHEY_PLAIN, 2, new Scalar(0, 0, 0), 3);
+        //Imgproc.putText(mRgba, "Utrzymaj telefon w miejscu aby zlapac ostrosc", new Point(225, 30), Core.FONT_HERSHEY_PLAIN, 2, new Scalar(0, 0, 0), 3);
 
 
         return mRgba;
